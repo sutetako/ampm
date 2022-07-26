@@ -59,7 +59,7 @@ def run(pid: int, interval: float, duration: float, output_type: str):
         usage = prev_cpu.usage(interval, diff_cpu)
         prev_cpu = diff_cpu
 
-        print(f'{comm}{sep}{usage}')
+        print(f'{comm}{sep}{usage}', flush=True)
         duration = duration - interval
 
 
