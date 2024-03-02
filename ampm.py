@@ -31,12 +31,18 @@ class CPUTime:
         return usage
 
 
-def read_stat(pid: int):
+def read_stat(pid: int) -> CPUTime:
     with open(os.path.join('/proc', str(pid), 'stat'), 'r') as f:
         s = f.read().split(' ')
     # comm, utime, stime, cutime, cstime, num_threads
-    return s[1], CPUTime(int(s[13]), int(s[14]), int(s[15]), int(s[16]),
-                         int(s[19]))
+    return CPUTime(int(s[13]), int(s[14]), int(s[15]), int(s[16]),
+                   int(s[19]))
+
+
+def read_comm(pid: int) -> str:
+    with open(os.path.join('/proc', str(pid), 'cmdline'), 'r') as f:
+        cmdline = f.read().split('\0')
+    return cmdline[0]
 
 
 def run(pid: int, interval: float, duration: float, output_type: str):
@@ -48,14 +54,15 @@ def run(pid: int, interval: float, duration: float, output_type: str):
         duration = sys.float_info.max
 
     t = time.perf_counter()
-    comm, b_cpu = read_stat(pid)
+    b_cpu = read_stat(pid)
+    comm = read_comm(pid)
     prev_cpu = b_cpu
 
     while duration > 0:
         time.sleep(interval - (time.perf_counter() - t))
 
         t = time.perf_counter()
-        _, diff_cpu = read_stat(pid)
+        diff_cpu = read_stat(pid)
         usage = prev_cpu.usage(interval, diff_cpu)
         prev_cpu = diff_cpu
 
