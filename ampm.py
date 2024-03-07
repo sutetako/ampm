@@ -58,16 +58,19 @@ def run(pid: int, interval: float, duration: float, output_type: str):
     comm = read_comm(pid)
     prev_cpu = b_cpu
 
-    while duration > 0:
-        time.sleep(interval - (time.perf_counter() - t))
+    try:
+        while duration > 0:
+            time.sleep(interval - (time.perf_counter() - t))
 
-        t = time.perf_counter()
-        diff_cpu = read_stat(pid)
-        usage = prev_cpu.usage(interval, diff_cpu)
-        prev_cpu = diff_cpu
+            t = time.perf_counter()
+            diff_cpu = read_stat(pid)
+            usage = prev_cpu.usage(interval, diff_cpu)
+            prev_cpu = diff_cpu
 
-        print(f'{comm}{sep}{usage}', flush=True)
-        duration = duration - interval
+            print(f'{comm}{sep}{usage}', flush=True)
+            duration = duration - interval
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == '__main__':
