@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import time
+import typing
 
 
 class CPUTime:
@@ -52,6 +53,15 @@ def read_smaps(pid: int) -> int:
     return int(rss)
 
 
+def print_summary(usage_h: typing.List[float], rss_h: typing.List[int]):
+    print('\n------ Summary ------')
+    print('      CPU[%]  RSS[kB]')
+    print(f'Max:   {max(usage_h):5.1f}  {max(rss_h):,}')
+    print(f'Min:   {min(usage_h):5.1f}  {min(rss_h):,}')
+    print(f'Ave:   {sum(usage_h)/len(usage_h):5.1f}  '
+          f'{sum(rss_h)//(len(rss_h)):,}')
+
+
 def run(pid: int, interval: float, duration: float, output_type: str):
     if output_type == 'csv':
         sep = ','
@@ -65,23 +75,31 @@ def run(pid: int, interval: float, duration: float, output_type: str):
     comm = read_comm(pid)
     prev_cpu = b_cpu
 
+    usage_h = []
+    rss_h = []
+
     try:
         # header
-        print(f'Command{sep}CPUUsage[%]{sep}RSS[kB]', flush=True)
+        print(f'Command{sep}CPU[%]{sep}RSS[kB]', flush=True)
         while duration > 0:
             time.sleep(interval - (time.perf_counter() - t))
 
             t = time.perf_counter()
             diff_cpu = read_stat(pid)
             cpu_usage = prev_cpu.usage(interval, diff_cpu)
+            usage_h.append(cpu_usage)
             prev_cpu = diff_cpu
 
             rss = read_smaps(pid)
+            rss_h.append(rss)
 
-            print(f'{comm}{sep}{cpu_usage}{sep}{rss}', flush=True)
+            print(f'{comm}{sep}{cpu_usage:.1f}{sep}{rss}', flush=True)
             duration = duration - interval
     except KeyboardInterrupt:
         pass
+    finally:
+        if len(usage_h) > 0 and len(rss_h) > 0:
+            print_summary(usage_h, rss_h)
 
 
 if __name__ == '__main__':
@@ -92,7 +110,7 @@ if __name__ == '__main__':
     parser.add_argument("pid", help="process ID. e.g. $(pidof foo)", type=int)
 
     parser.add_argument("-r", "--rate",
-                        help="calculation frequency. default:1 (>= 0.01)",
+                        help="calculation frequency. default:1 (< CLK_TCK/2)",
                         type=float, default="1", action="store")
     parser.add_argument("-d", "--duration",
                         help="monitoring duration [sec], 0 means inf.\
@@ -103,5 +121,10 @@ if __name__ == '__main__':
                         default="", action="store")
 
     args = parser.parse_args()
+
+    if args.rate > float(CPUTime.CLK_TCK)/2.0:
+        print(f'Your rate exceeds the limit [{int(CPUTime.CLK_TCK)/2}]!',
+              file=sys.stderr)
+        sys.exit(1)
 
     run(args.pid, 1/args.rate, float(args.duration), args.type)
