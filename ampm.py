@@ -110,7 +110,7 @@ if __name__ == '__main__':
     parser.add_argument("pid", help="process ID. e.g. $(pidof foo)", type=int)
 
     parser.add_argument("-r", "--rate",
-                        help="calculation frequency. default:1 (>= 0.01)",
+                        help="calculation frequency. default:1 (< CLK_TCK/2)",
                         type=float, default="1", action="store")
     parser.add_argument("-d", "--duration",
                         help="monitoring duration [sec], 0 means inf.\
@@ -121,5 +121,10 @@ if __name__ == '__main__':
                         default="", action="store")
 
     args = parser.parse_args()
+
+    if args.rate > float(CPUTime.CLK_TCK)/2.0:
+        print(f'Your rate exceeds the limit [{int(CPUTime.CLK_TCK)/2}]!',
+              file=sys.stderr)
+        sys.exit(1)
 
     run(args.pid, 1/args.rate, float(args.duration), args.type)
