@@ -88,9 +88,8 @@ class UsageHistory:
 def read_stat(pid: int) -> CPUTime:
     with open(os.path.join('/proc', str(pid), 'stat'), 'r') as f:
         s = f.read().split()
-    # comm, utime, stime, cutime, cstime, num_threads
-    return CPUTime(int(s[13]), int(s[14]), int(s[15]), int(s[16]),
-                   int(s[19]))
+    # utime, stime, cutime, cstime, num_threads
+    return CPUTime(int(s[13]), int(s[14]), int(s[15]), int(s[16]), int(s[19]))
 
 
 def read_comm(pid: int) -> str:
