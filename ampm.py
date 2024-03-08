@@ -4,8 +4,8 @@ import argparse
 import os
 import subprocess
 import sys
+import threading
 import time
-import typing
 
 
 class CPUTime:
@@ -13,7 +13,7 @@ class CPUTime:
     CLK_TCK = float(subprocess.run(
         ['getconf', 'CLK_TCK'], capture_output=True).stdout)
 
-    def __init__(self: int, utime: int, stime: int, cutime: int, cstime: int,
+    def __init__(self, utime: int, stime: int, cutime: int, cstime: int,
                  num_threads: int):
         self._utime = utime
         self._stime = stime
@@ -30,6 +30,59 @@ class CPUTime:
         if usage > (diff_usage._cpu_max):
             return diff_usage._cpu_max
         return usage
+
+
+class UsageHistory:
+
+    def __init__(self):
+        self._rss = []
+        self._cpu = []
+        self._index = -1
+        self._read = -1
+        self._cv = threading.Condition()
+        self._term = False
+
+    def append(self, cpu: float, rss: int):
+        with self._cv:
+            self._cpu.append(cpu)
+            self._rss.append(rss)
+            self._index = self._index + 1
+            self._cv.notify()
+
+    def get(self) -> (float, int, bool):
+        with self._cv:
+            while self._index == self._read and not self._term:
+                self._cv.wait()
+            if self._index != self._read:
+                self._read = self._read + 1
+                return self._cpu[self._index], self._rss[self._index], True
+        return 0.0, 0, False
+
+    def term(self):
+        with self._cv:
+            self._term = True
+            self._cv.notify()
+
+    def is_term(self):
+        with self._cv:
+            return self._term
+
+    def empty(self) -> bool:
+        with self._cv:
+            return (len(self._cpu) == 0 or len(self._rss) == 0)
+
+    def max(self) -> (float, int):
+        with self._cv:
+            return max(self._cpu), max(self._rss)
+
+    def min(self) -> (float, int):
+        with self._cv:
+            return min(self._cpu), min(self._rss)
+
+    def ave(self) -> (float, int):
+        with self._cv:
+            return sum(self._cpu)/len(self._cpu), \
+                sum(self._rss)//len(self._rss)
 
 
 def read_stat(pid: int) -> CPUTime:
@@ -53,53 +106,69 @@ def read_smaps(pid: int) -> int:
     return int(rss)
 
 
-def print_summary(usage_h: typing.List[float], rss_h: typing.List[int]):
+def print_summary(hist: UsageHistory):
+    maxs = hist.max()
+    mins = hist.min()
+    aves = hist.ave()
     print('\n------ Summary ------')
     print('      CPU[%]  RSS[kB]')
-    print(f'Max:   {max(usage_h):5.1f}  {max(rss_h):,}')
-    print(f'Min:   {min(usage_h):5.1f}  {min(rss_h):,}')
-    print(f'Ave:   {sum(usage_h)/len(usage_h):5.1f}  '
-          f'{sum(rss_h)//(len(rss_h)):,}')
+    print(f'Max:   {maxs[0]:5.1f}  {maxs[1]:,}')
+    print(f'Min:   {mins[0]:5.1f}  {mins[1]:,}')
+    print(f'Ave:   {aves[0]:5.1f}  {aves[1]:,}')
 
 
-def run(pid: int, interval: float, duration: float, output_type: str):
+def print_lines(comm: str, sep: str, hist: UsageHistory):
+    # header
+    print(f'Command{sep}CPU[%]{sep}RSS[kB]')
+    while not hist.is_term():
+        cpu, rss, ret = hist.get()
+        if ret:
+            print(f'{comm}{sep}{cpu:.1f}{sep}{rss}')
+
+
+def run(pid: int, rate: float, duration: float, output_type: str):
     if output_type == 'csv':
         sep = ','
     else:
         sep = ' '
     if duration == 0:
-        duration = sys.float_info.max
+        times = sys.maxsize
+    else:
+        times = int(duration * rate)
 
+    interval = 1/rate
     t = time.perf_counter()
     b_cpu = read_stat(pid)
     comm = read_comm(pid)
     prev_cpu = b_cpu
 
-    usage_h = []
-    rss_h = []
+    hist = UsageHistory()
+
+    print_t = threading.Thread(target=print_lines, args=(comm, sep, hist))
+    print_t.start()
 
     try:
-        # header
-        print(f'Command{sep}CPU[%]{sep}RSS[kB]', flush=True)
-        while duration > 0:
-            time.sleep(interval - (time.perf_counter() - t))
+        while times > 0:
+            sleep_time = interval - (time.perf_counter() - t)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
             t = time.perf_counter()
             diff_cpu = read_stat(pid)
             cpu_usage = prev_cpu.usage(interval, diff_cpu)
-            usage_h.append(cpu_usage)
             prev_cpu = diff_cpu
 
             rss = read_smaps(pid)
-            rss_h.append(rss)
 
-            print(f'{comm}{sep}{cpu_usage:.1f}{sep}{rss}', flush=True)
-            duration = duration - interval
+            hist.append(cpu_usage, rss)
+            times = times - 1
     except KeyboardInterrupt:
         pass
     finally:
-        if len(usage_h) > 0 and len(rss_h) > 0:
-            print_summary(usage_h, rss_h)
+        hist.term()
+        print_t.join()
+        if not hist.empty():
+            print_summary(hist)
 
 
 if __name__ == '__main__':
@@ -127,4 +196,4 @@ if __name__ == '__main__':
               file=sys.stderr)
         sys.exit(1)
 
-    run(args.pid, 1/args.rate, float(args.duration), args.type)
+    run(args.pid, args.rate, float(args.duration), args.type)
