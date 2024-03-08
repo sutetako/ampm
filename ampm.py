@@ -174,20 +174,20 @@ def run(pid: int, rate: float, duration: float, output_type: str):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
-        description="A siMple Process Monitor."
+        description='A siMple Process Monitor.'
     )
-    parser.add_argument("pid", help="process ID. e.g. $(pidof foo)", type=int)
+    parser.add_argument('pid', help='process ID. e.g. $(pidof foo)', type=int)
 
-    parser.add_argument("-r", "--rate",
-                        help="calculation frequency. default:1 (< CLK_TCK/2)",
-                        type=float, default="1", action="store")
-    parser.add_argument("-d", "--duration",
-                        help="monitoring duration [sec], 0 means inf.\
-                        default:0 (>= 0)",
-                        type=int, default=0, action="store")
-    parser.add_argument("-t", "--type",
-                        help="Output type. default:"" [|csv]",
-                        default="", action="store")
+    parser.add_argument('-r', '--rate',
+                        help='calculation frequency. default:1 (< CLK_TCK/2)',
+                        type=float, default='1', action='store')
+    parser.add_argument('-d', '--duration',
+                        help='monitoring duration [sec], 0 means inf.\
+                        default:0 (>= 0)',
+                        type=int, default=0, action='store')
+    parser.add_argument('-t', '--type',
+                        help='Output type. default:"" [|csv]',
+                        default='', action='store')
 
     args = parser.parse_args()
 
