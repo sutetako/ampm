@@ -95,7 +95,7 @@ def read_stat(pid: int) -> CPUTime:
 def read_comm(pid: int) -> str:
     with open(os.path.join('/proc', str(pid), 'cmdline'), 'r') as f:
         cmdline = f.read().split('\0')
-    return cmdline[0]
+    return cmdline[0].split()[0]
 
 
 def read_smaps(pid: int) -> int:
