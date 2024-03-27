@@ -110,15 +110,15 @@ def print_summary(hist: UsageHistory):
     mins = hist.min()
     aves = hist.ave()
     print('\n------ Summary ------')
-    print('      CPU[%]  RSS[kB]')
-    print(f'Max:   {maxs[0]:5.1f}  {maxs[1]:,}')
-    print(f'Min:   {mins[0]:5.1f}  {mins[1]:,}')
-    print(f'Ave:   {aves[0]:5.1f}  {aves[1]:,}')
+    print('       %CPU  kB_RSS')
+    print(f'Max:  {maxs[0]:5.1f}  {maxs[1]:,}')
+    print(f'Min:  {mins[0]:5.1f}  {mins[1]:,}')
+    print(f'Ave:  {aves[0]:5.1f}  {aves[1]:,}')
 
 
 def print_lines(comm: str, sep: str, hist: UsageHistory):
     # header
-    print(f'Command{sep}CPU[%]{sep}RSS[kB]')
+    print(f'Command{sep}%CPU{sep}kB_RSS')
     while not hist.is_term():
         cpu, rss, ret = hist.get()
         if ret:
