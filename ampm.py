@@ -93,16 +93,27 @@ def read_stat(pid: int) -> CPUTime:
 
 
 def read_comm(pid: int) -> str:
-    with open(os.path.join('/proc', str(pid), 'cmdline'), 'r') as f:
-        cmdline = f.read().split('\0')
-    return cmdline[0].split()[0]
+    parent = os.path.join('/proc', str(pid))
+    comm = ''
+    with open(os.path.join(parent, 'cmdline'), 'r') as f:
+        cmdline = f.read().split('\0')[0]
+    if len(cmdline) > 0:
+        comm = cmdline
+    else:
+        with open(os.path.join(parent, 'comm'), 'r') as f:
+            comm = f.read()
+    return comm.split()[0]
 
 
 def read_smaps(pid: int) -> int:
-    with open(os.path.join('/proc', str(pid), 'smaps_rollup'), 'r') as f:
-        next(f)
-        rss = f.readline().split()[1]
-    return int(rss)
+    try:
+        with open(os.path.join('/proc', str(pid), 'smaps_rollup'), 'r') as f:
+            next(f)
+            rss = int(f.readline().split()[1])
+    except OSError:
+        rss = 0
+
+    return rss
 
 
 def print_summary(hist: UsageHistory):
